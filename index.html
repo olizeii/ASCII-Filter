@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Desktop → ASCII Overlay</title>
+<style>
+  html, body { margin:0; height:100%; background:#000; }
+
+
+  pre#ascii {
+    position: fixed; inset: 0;
+    margin: 0;
+    color: #fff;
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    font-size: 10px;
+    line-height: 8px;   /* Verhältnis Schrift-Höhe zu Breite */
+    white-space: pre;
+    letter-spacing: 0;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .hud {
+    position: fixed; left: 8px; top: 8px;
+    color: #0f0;
+    font: 12px/1 monospace;
+    opacity: 0.8;
+    pointer-events: none;
+    text-shadow: 0 0 4px #000;
+  }
+
+</style>
+</head>
+<body>
+  <pre id="ascii">Starte…</pre>
+  <div class="hud" id="hud"></div>
+
+<script>
+  const { desktopCapturer } = require('electron');
+
+  // Zeichensatz von hell nach dunkel
+  const ASCII = " .:-=+*#%@";
+  const MAX_FPS = 30;   // 30 FPS reicht meist
+  let COLS = 200;
+  const ASPECT = 0.55;  // Zeichenverhältnis
+
+  const pre = document.getElementById('ascii');
+  const hud = document.getElementById('hud');
+
+  // Offscreen-Canvas für Runterskalierung
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+
+  function grayToChar(g) {
+    return ASCII[Math.floor(g * (ASCII.length - 1) / 255)];
+  }
+
+  async function getScreenStream() {
+    const sources = await desktopCapturer.getSources({ types: ['screen'] });
+    const source = sources[0];
+    return await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: 'desktop',
+          chromeMediaSourceId: source.id,
+          maxFrameRate: MAX_FPS
+        }
+      }
+    });
+  }
+
+  async function start() {
+    try {
+      console.log("Hole Source…");
+      const stream = await getScreenStream();
+      console.log("Stream bekommen:", stream);
+
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.muted = true;
+      await video.play();
+      console.log("Video läuft");
+
+      function resizeGrid() {
+        // z.B. ein Zeichen = 8 Pixel breit
+        COLS = Math.round(video.videoWidth / 8);
+        const rows = Math.round(video.videoHeight / 16); // anpassen ans Font Verhältnis
+        c.width = COLS;
+        c.height = rows;
+      }
+      
+      resizeGrid();
+      window.addEventListener('resize', resizeGrid);
+
+      // FPS-Berechnung
+      let frames = 0, lastFpsT = performance.now();
+
+      function loop(now) {
+        ctx.drawImage(video, 0, 0, c.width, c.height);
+        const data = ctx.getImageData(0, 0, c.width, c.height).data;
+
+        let out = '';
+        for (let y = 0, i = 0; y < c.height; y++) {
+          for (let x = 0; x < c.width; x++, i += 4) {
+            const gray = (data[i]*299 + data[i+1]*587 + data[i+2]*114) / 1000;
+            out += grayToChar(gray);
+          }
+          out += '\n';
+        }
+        pre.textContent = out;
+
+        frames++;
+        if (now - lastFpsT > 500) {
+          const fps = Math.round(frames * 1000 / (now - lastFpsT));
+          hud.textContent = `ASCII ${COLS}x${c.height} | ~${fps} FPS | ESC zum Beenden`;
+          frames = 0;
+          lastFpsT = now;
+        }
+
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+
+    } catch (e) {
+      pre.textContent = 'Fehler/Permission: ' + e;
+    }
+  }
+  console.log("window.electronAPI vor start():", window.electronAPI);
+  // Start einmal!
+  start();
+</script>
+</body>
+</html>

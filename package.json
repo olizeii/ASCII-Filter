@@ -1,0 +1,12 @@
+{
+  "name": "desktop-ascii-overlay",
+  "version": "1.0.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "16.2.8"
+  }
+}
