@@ -1,7 +1,23 @@
 const { app, BrowserWindow, screen, globalShortcut, session } = require('electron');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
-function createOverlay() {
+function parseCLI() {
+  let size;
+  const argv = process.argv.slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--size') {
+      size = argv[i + 1] ?? 'auto';
+      i++;
+    } else if (a.startsWith('--size=')) {
+      size = a.split('=')[1];
+    }
+  }
+  return { size };
+}
+
+function createOverlay(opts = {}) {
   const primary = screen.getPrimaryDisplay();
   const { x, y, width, height } = primary.bounds;
 
@@ -23,29 +39,29 @@ function createOverlay() {
     }
   });
 
-  // Maus-/Touch-Events durchreichen (du klickst deine Apps „darunter“)
   win.setIgnoreMouseEvents(true, { forward: true });
-
-  // Overlay selbst nicht mitcapturen (verhindert Spiegel-Effekt)
   win.setContentProtection(true);
 
-  win.loadFile('index.html');
+  // Load index.html with ?size=... in the URL
+  const fileUrl = pathToFileURL(path.join(__dirname, 'index.html'));
+  if (opts.size) fileUrl.searchParams.set('size', String(opts.size));
+  win.loadURL(fileUrl.href);
 
-  // Optional zum Debuggen:
-  win.webContents.openDevTools({ mode: 'detach' });
+  // Optional for debugging
+  //win.webContents.openDevTools({ mode: 'detach' });
 
   // ESC = beenden
   globalShortcut.register('Esc', () => app.quit());
 }
 
 app.whenReady().then(() => {
-  // Nur Screen-/Media-Capture erlauben, alles andere ablehnen
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
     const allow = permission === 'media' || permission === 'display-capture';
     callback(allow);
   });
 
-  createOverlay();
+  const opts = parseCLI();
+  createOverlay(opts);
 });
 
 app.on('will-quit', () => {
