@@ -20,9 +20,11 @@ Save the files into one folder. Download node.js.
 <br>
 Open your CMD, write 
 <br>
+<br>
 ```npm install``` 
 <br>
 after that type 
+<br>
 <br>
 ```npm start```
 <br>
