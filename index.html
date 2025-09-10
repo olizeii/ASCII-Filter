@@ -6,14 +6,13 @@
 <style>
   html, body { margin:0; height:100%; background:#000; }
 
-
   pre#ascii {
     position: fixed; inset: 0;
     margin: 0;
     color: #fff;
     font-family: "Consolas", "DejaVu Sans Mono", monospace;
-    font-size: 10px;
-    line-height: 8px;   /* Verhältnis Schrift-Höhe zu Breite */
+    font-size: 10px;     /* will be overridden by JS if --size is used */
+    line-height: 8px;    /* will be overridden by JS */
     white-space: pre;
     letter-spacing: 0;
     user-select: none;
@@ -28,7 +27,6 @@
     pointer-events: none;
     text-shadow: 0 0 4px #000;
   }
-
 </style>
 </head>
 <body>
@@ -38,21 +36,63 @@
 <script>
   const { desktopCapturer } = require('electron');
 
-  // Zeichensatz von hell nach dunkel
   const ASCII = " .:-=+*#%@";
-  const MAX_FPS = 30;   // 30 FPS reicht meist
-  let COLS = 200;
-  const ASPECT = 0.55;  // Zeichenverhältnis
+  const MAX_FPS = 30;
+  const LINE_RATIO = 0.8;   // line-height = fontSize * LINE_RATIO
+  let COLS = 200, ROWS = 100;
 
   const pre = document.getElementById('ascii');
   const hud = document.getElementById('hud');
 
-  // Offscreen-Canvas für Runterskalierung
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d', { willReadFrequently: true });
 
+  // Read --size from query (?size=auto or ?size=14)
+  const params = new URLSearchParams(location.search);
+  const sizeParamRaw = params.get('size');
+  const sizeParam = sizeParamRaw ? String(sizeParamRaw).trim().toLowerCase() : null;
+
   function grayToChar(g) {
     return ASCII[Math.floor(g * (ASCII.length - 1) / 255)];
+  }
+
+  function applyFontSize() {
+    // auto: use base 10px (grid will adapt to screen)
+    // number: set fixed px
+    let fontPx = 10;
+    if (sizeParam && sizeParam !== 'auto') {
+      const n = parseInt(sizeParam, 10);
+      if (Number.isFinite(n) && n > 0) fontPx = n;
+    }
+    pre.style.fontSize = fontPx + 'px';
+    pre.style.lineHeight = Math.max(1, Math.round(fontPx * LINE_RATIO)) + 'px';
+    return fontPx;
+  }
+
+  function measureCharSize() {
+    // measure character cell
+    const test = document.createElement('span');
+    test.textContent = '0'.repeat(100);
+    const cs = getComputedStyle(pre);
+    test.style.fontFamily = cs.fontFamily;
+    test.style.fontSize = cs.fontSize;
+    test.style.position = 'absolute';
+    test.style.visibility = 'hidden';
+    test.style.whiteSpace = 'nowrap';
+    document.body.appendChild(test);
+    const charW = test.getBoundingClientRect().width / 100;
+    document.body.removeChild(test);
+    const charH = parseFloat(cs.lineHeight);
+    return { charW, charH };
+  }
+
+  function recalcGrid() {
+    // Compute how many characters fit into the viewport
+    const { charW, charH } = measureCharSize();
+    COLS = Math.max(1, Math.floor(window.innerWidth / charW));
+    ROWS = Math.max(1, Math.floor(window.innerHeight / charH));
+    c.width = COLS;
+    c.height = ROWS;
   }
 
   async function getScreenStream() {
@@ -72,28 +112,24 @@
 
   async function start() {
     try {
-      console.log("Hole Source…");
+      applyFontSize();
+      recalcGrid();
+
+      // Keep grid fitting when the window size changes
+      window.addEventListener('resize', () => {
+        // Only font-size is fixed if --size=NUMBER; grid still adapts to viewport
+        if (sizeParam === 'auto') applyFontSize();
+        recalcGrid();
+      });
+
       const stream = await getScreenStream();
-      console.log("Stream bekommen:", stream);
 
       const video = document.createElement('video');
       video.srcObject = stream;
       video.muted = true;
       await video.play();
-      console.log("Video läuft");
 
-      function resizeGrid() {
-        // z.B. ein Zeichen = 8 Pixel breit
-        COLS = Math.round(video.videoWidth / 8);
-        const rows = Math.round(video.videoHeight / 16); // anpassen ans Font Verhältnis
-        c.width = COLS;
-        c.height = rows;
-      }
-      
-      resizeGrid();
-      window.addEventListener('resize', resizeGrid);
-
-      // FPS-Berechnung
+      // FPS counter
       let frames = 0, lastFpsT = performance.now();
 
       function loop(now) {
@@ -113,7 +149,9 @@
         frames++;
         if (now - lastFpsT > 500) {
           const fps = Math.round(frames * 1000 / (now - lastFpsT));
-          hud.textContent = `ASCII ${COLS}x${c.height} | ~${fps} FPS | ESC zum Beenden`;
+          const cs = getComputedStyle(pre);
+          const sizeLbl = sizeParam === 'auto' ? 'auto' : `${parseFloat(cs.fontSize)}px`;
+          hud.textContent = `ASCII ${COLS}x${c.height} | size: ${sizeLbl} | ~${fps} FPS | ESC zum Beenden`;
           frames = 0;
           lastFpsT = now;
         }
@@ -126,8 +164,7 @@
       pre.textContent = 'Fehler/Permission: ' + e;
     }
   }
-  console.log("window.electronAPI vor start():", window.electronAPI);
-  // Start einmal!
+
   start();
 </script>
 </body>
