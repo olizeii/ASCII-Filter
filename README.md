@@ -29,4 +29,4 @@ after that type
 after that the programm should launch, to Exit just press "Esc"
 <br>
 <br>
-If there are any Errors let me know in the """Issues""" Tab
+If there are any Errors let me know in the '''Issues''' Tab
