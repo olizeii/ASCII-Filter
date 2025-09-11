@@ -32,4 +32,14 @@ after that type
 after that the programm should launch, to Exit just press "Esc"
 <br>
 <br>
+After some changes you know can write
+<br>
+<br>
+```npm start -- --size=4```
+<br>
+<br>
+The size command changes how many pixels(real) get changed into ASCII (less size more acuracy)
+<br>
+<br>
+<br>
 If there are any Errors let me know in the ``` Issues ``` Tab
