@@ -41,6 +41,6 @@ After some changes you know can write
 The size command changes how many pixels(real) get changed into ASCII (less size more acuracy)
 <br>
 <br>
-Working at a fix to the "second curser" bug //fix is comming soon :^)
+UPDATE:
 <br>
 If there are any Errors let me know in the ``` Issues ``` Tab
