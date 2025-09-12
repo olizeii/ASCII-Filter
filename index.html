@@ -1,171 +1,67 @@
-<!doctype html>
-<html lang="de">
-<head>
-<meta charset="utf-8" />
-<title>Desktop → ASCII Overlay</title>
-<style>
-  html, body { margin:0; height:100%; background:#000; }
+const { app, BrowserWindow, screen, globalShortcut, session } = require('electron');
 
-  pre#ascii {
-    position: fixed; inset: 0;
-    margin: 0;
-    color: #fff;
-    font-family: "Consolas", "DejaVu Sans Mono", monospace;
-    font-size: 10px;     /* will be overridden by JS if --size is used */
-    line-height: 8px;    /* will be overridden by JS */
-    white-space: pre;
-    letter-spacing: 0;
-    user-select: none;
-    pointer-events: none;
+function parseCLI() {
+  const args = process.argv.slice(2);
+  let size = 'auto';
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--size') { size = args[i + 1] ?? 'auto'; i++; continue; }
+    if (a.startsWith('--size=')) { size = a.split('=')[1]; }
   }
+  return { size };
+}
 
-  .hud {
-    position: fixed; left: 8px; top: 8px;
-    color: #0f0;
-    font: 12px/1 monospace;
-    opacity: 0.8;
-    pointer-events: none;
-    text-shadow: 0 0 4px #000;
-  }
-</style>
-</head>
-<body>
-  <pre id="ascii">Starte…</pre>
-  <div class="hud" id="hud"></div>
+function createOverlay(opts = {}) {
+  const primary = screen.getPrimaryDisplay();
+  const bounds = primary.bounds;             // full monitor (DIP)
+  const work = primary.workArea || bounds;   // minus taskbar/dock (DIP)
 
-<script>
-  const { desktopCapturer } = require('electron');
-
-  const ASCII = " .:-=+*#%@";
-  const MAX_FPS = 30;
-  const LINE_RATIO = 0.8;   // line-height = fontSize * LINE_RATIO
-  let COLS = 200, ROWS = 100;
-
-  const pre = document.getElementById('ascii');
-  const hud = document.getElementById('hud');
-
-  const c = document.createElement('canvas');
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-
-  // Read --size from query (?size=auto or ?size=14)
-  const params = new URLSearchParams(location.search);
-  const sizeParamRaw = params.get('size');
-  const sizeParam = sizeParamRaw ? String(sizeParamRaw).trim().toLowerCase() : null;
-
-  function grayToChar(g) {
-    return ASCII[Math.floor(g * (ASCII.length - 1) / 255)];
-  }
-
-  function applyFontSize() {
-    // auto: use base 10px (grid will adapt to screen)
-    // number: set fixed px
-    let fontPx = 10;
-    if (sizeParam && sizeParam !== 'auto') {
-      const n = parseInt(sizeParam, 10);
-      if (Number.isFinite(n) && n > 0) fontPx = n;
+  const win = new BrowserWindow({
+    x: work.x, y: work.y,
+    width: work.width, height: work.height,
+    frame: false,
+    resizable: false,
+    movable: false,
+    fullscreen: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: false,
+    backgroundColor: '#000000',
+    transparent: false,
+    hasShadow: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
     }
-    pre.style.fontSize = fontPx + 'px';
-    pre.style.lineHeight = Math.max(1, Math.round(fontPx * LINE_RATIO)) + 'px';
-    return fontPx;
-  }
+  });
 
-  function measureCharSize() {
-    // measure character cell
-    const test = document.createElement('span');
-    test.textContent = '0'.repeat(100);
-    const cs = getComputedStyle(pre);
-    test.style.fontFamily = cs.fontFamily;
-    test.style.fontSize = cs.fontSize;
-    test.style.position = 'absolute';
-    test.style.visibility = 'hidden';
-    test.style.whiteSpace = 'nowrap';
-    document.body.appendChild(test);
-    const charW = test.getBoundingClientRect().width / 100;
-    document.body.removeChild(test);
-    const charH = parseFloat(cs.lineHeight);
-    return { charW, charH };
-  }
+  win.setIgnoreMouseEvents(true, { forward: true });
+  win.setContentProtection(true);
 
-  function recalcGrid() {
-    // Compute how many characters fit into the viewport
-    const { charW, charH } = measureCharSize();
-    COLS = Math.max(1, Math.floor(window.innerWidth / charW));
-    ROWS = Math.max(1, Math.floor(window.innerHeight / charH));
-    c.width = COLS;
-    c.height = ROWS;
-  }
+  // Pass rectangles + size to the renderer
+  const params = new URLSearchParams({
+    bx: String(bounds.x), by: String(bounds.y), bw: String(bounds.width), bh: String(bounds.height),
+    wx: String(work.x),   wy: String(work.y),   ww: String(work.width),   wh: String(work.height),
+    s: String(opts.size ?? 'auto')
+  });
 
-  async function getScreenStream() {
-    const sources = await desktopCapturer.getSources({ types: ['screen'] });
-    const source = sources[0];
-    return await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        mandatory: {
-          chromeMediaSource: 'desktop',
-          chromeMediaSourceId: source.id,
-          maxFrameRate: MAX_FPS
-        }
-      }
-    });
-  }
+  win.loadFile('index.html', { search: `?${params.toString()}` });
 
-  async function start() {
-    try {
-      applyFontSize();
-      recalcGrid();
+  globalShortcut.register('Esc', () => app.quit()); // enable if you want ESC to quit
+}
 
-      // Keep grid fitting when the window size changes
-      window.addEventListener('resize', () => {
-        // Only font-size is fixed if --size=NUMBER; grid still adapts to viewport
-        if (sizeParam === 'auto') applyFontSize();
-        recalcGrid();
-      });
+app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allow = permission === 'media' || permission === 'display-capture';
+    callback(allow);
+  });
 
-      const stream = await getScreenStream();
+  const opts = parseCLI();
+  createOverlay(opts);
+});
 
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      video.muted = true;
-      await video.play();
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+});
 
-      // FPS counter
-      let frames = 0, lastFpsT = performance.now();
-
-      function loop(now) {
-        ctx.drawImage(video, 0, 0, c.width, c.height);
-        const data = ctx.getImageData(0, 0, c.width, c.height).data;
-
-        let out = '';
-        for (let y = 0, i = 0; y < c.height; y++) {
-          for (let x = 0; x < c.width; x++, i += 4) {
-            const gray = (data[i]*299 + data[i+1]*587 + data[i+2]*114) / 1000;
-            out += grayToChar(gray);
-          }
-          out += '\n';
-        }
-        pre.textContent = out;
-
-        frames++;
-        if (now - lastFpsT > 500) {
-          const fps = Math.round(frames * 1000 / (now - lastFpsT));
-          const cs = getComputedStyle(pre);
-          const sizeLbl = sizeParam === 'auto' ? 'auto' : `${parseFloat(cs.fontSize)}px`;
-          hud.textContent = `ASCII ${COLS}x${c.height} | size: ${sizeLbl} | ~${fps} FPS | ESC zum Beenden`;
-          frames = 0;
-          lastFpsT = now;
-        }
-
-        requestAnimationFrame(loop);
-      }
-      requestAnimationFrame(loop);
-
-    } catch (e) {
-      pre.textContent = 'Fehler/Permission: ' + e;
-    }
-  }
-
-  start();
-</script>
-</body>
-</html>
+app.on('window-all-closed', () => app.quit());
