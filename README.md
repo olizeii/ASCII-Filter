@@ -41,6 +41,18 @@ After some changes you know can write
 The size command changes how many pixels(real) get changed into ASCII (less size more acuracy)
 <br>
 <br>
-UPDATE:
+### UPDATE:
+Fixed the Issue with the wrong curser.
+<br>
+<br>
+_________________________________________________________________________________________________________________________________________________________________________________
+### Upcomming changes
+<br>
+<br>
+```npm start -- --charset=ABCDEFG.-,```
+<br>
+<br>
+The charset command is going to help to what chars are going to get used
+
 <br>
 If there are any Errors let me know in the ``` Issues ``` Tab
