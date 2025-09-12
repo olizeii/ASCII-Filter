@@ -52,7 +52,8 @@ ________________________________________________________________________________
 
 <br>
 <br>
-```npm start -- --charset=ABCDEFG.-,```
+
+```npm start -- --charset=ABCDEFG ```
 <br>
 <br>
 The charset command is going to help to what chars are going to get used
