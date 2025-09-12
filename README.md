@@ -4,11 +4,11 @@
 
 
 ```
-   ___   _    _ ____ ___ _    _ __   _  ___
-  / _ \ | |  | |__  /  _| |  | |   \| |/  _|
- / / \ \| |  | | / /| |_| |  | | |\ \ |  /
- \ \_/ /| |__| |/ /_| |_| |_ | | | \  |  \_
-  \___/ |____|_|____|___|_|_||_|_|  \_|\___|
+   ___  _    _ ____ ___ _    _ __   _  ___
+  / _ \| |  | |__  /  _| |  | |   \| |/  _|
+ / / \ | |  | | / /| |_| |  | | |\ \ |  /
+ \ \_/ | |__| |/ /_| |_| |_ | | | \  |  \_
+  \___/|____|_|____|___|_|_||_|_|  \_|\___|
 ```
 
 <br>
@@ -37,12 +37,18 @@ After some changes you know can write
 <br>
 ```npm start -- --size=4```
 <br>
+<br> 
+```npm start -- --charset=ABC```
 <br>
+<br> 
 The size command changes how many pixels(real) get changed into ASCII (less size more acuracy)
 <br>
 <br>
 ### UPDATE:
-> Fixed the Issue with the wrong curser.
+> Fixed the Issue with the wrong curser. //11.09.2025
+
+
+> Added the --charset command //12.09.2025
 <br>
 <br>
 _____________________________________________________________________________________________________________________________
@@ -53,10 +59,8 @@ ________________________________________________________________________________
 <br>
 <br>
 
-```npm start -- --charset=ABCDEFG ```
-<br>
-<br>
-The charset command is going to help to what chars are going to get used
+> maybe I am going to add a colored Version where you can add colors on the ASCII's to get a more identifiable Output with better FPS, probalby with an "--colored" command
 
+<br>
 <br>
 If there are any Errors let me know in the ``` Issues ``` Tab
