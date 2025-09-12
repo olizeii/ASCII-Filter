@@ -3,12 +3,20 @@ const { app, BrowserWindow, screen, globalShortcut, session } = require('electro
 function parseCLI() {
   const args = process.argv.slice(2);
   let size = 'auto';
+  let charset = null;
+
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
+
+    // --size / --size=...
     if (a === '--size') { size = args[i + 1] ?? 'auto'; i++; continue; }
-    if (a.startsWith('--size=')) { size = a.split('=')[1]; }
+    if (a.startsWith('--size=')) { size = a.slice('--size='.length); continue; }
+
+    // --charset / --charset=...
+    if (a === '--charset') { charset = args[i + 1] ?? ''; i++; continue; }
+    if (a.startsWith('--charset=')) { charset = a.slice('--charset='.length); continue; }
   }
-  return { size };
+  return { size, charset };
 }
 
 function createOverlay(opts = {}) {
@@ -38,16 +46,17 @@ function createOverlay(opts = {}) {
   win.setIgnoreMouseEvents(true, { forward: true });
   win.setContentProtection(true);
 
-  // Pass rectangles + size to the renderer
+  // Pass rects + options to renderer
   const params = new URLSearchParams({
     bx: String(bounds.x), by: String(bounds.y), bw: String(bounds.width), bh: String(bounds.height),
     wx: String(work.x),   wy: String(work.y),   ww: String(work.width),   wh: String(work.height),
     s: String(opts.size ?? 'auto')
   });
+  if (opts.charset != null) params.set('ch', opts.charset);
 
   win.loadFile('index.html', { search: `?${params.toString()}` });
 
-  globalShortcut.register('Esc', () => app.quit()); // enable if you want ESC to quit
+  globalShortcut.register('Esc', () => app.quit());
 }
 
 app.whenReady().then(() => {
