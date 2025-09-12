@@ -1,28 +1,24 @@
 const { app, BrowserWindow, screen, globalShortcut, session } = require('electron');
-const path = require('path');
-const { pathToFileURL } = require('url');
 
 function parseCLI() {
-  let size;
-  const argv = process.argv.slice(2);
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--size') {
-      size = argv[i + 1] ?? 'auto';
-      i++;
-    } else if (a.startsWith('--size=')) {
-      size = a.split('=')[1];
-    }
+  const args = process.argv.slice(2);
+  let size = 'auto';
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--size') { size = args[i + 1] ?? 'auto'; i++; continue; }
+    if (a.startsWith('--size=')) { size = a.split('=')[1]; }
   }
   return { size };
 }
 
 function createOverlay(opts = {}) {
   const primary = screen.getPrimaryDisplay();
-  const { x, y, width, height } = primary.bounds;
+  const bounds = primary.bounds;             // full monitor (DIP)
+  const work = primary.workArea || bounds;   // minus taskbar/dock (DIP)
 
   const win = new BrowserWindow({
-    x, y, width, height,
+    x: work.x, y: work.y,
+    width: work.width, height: work.height,
     frame: false,
     resizable: false,
     movable: false,
@@ -42,16 +38,16 @@ function createOverlay(opts = {}) {
   win.setIgnoreMouseEvents(true, { forward: true });
   win.setContentProtection(true);
 
-  // Load index.html with ?size=... in the URL
-  const fileUrl = pathToFileURL(path.join(__dirname, 'index.html'));
-  if (opts.size) fileUrl.searchParams.set('size', String(opts.size));
-  win.loadURL(fileUrl.href);
+  // Pass rectangles + size to the renderer
+  const params = new URLSearchParams({
+    bx: String(bounds.x), by: String(bounds.y), bw: String(bounds.width), bh: String(bounds.height),
+    wx: String(work.x),   wy: String(work.y),   ww: String(work.width),   wh: String(work.height),
+    s: String(opts.size ?? 'auto')
+  });
 
-  // Optional for debugging
-  //win.webContents.openDevTools({ mode: 'detach' });
+  win.loadFile('index.html', { search: `?${params.toString()}` });
 
-  // ESC = beenden
-  globalShortcut.register('Esc', () => app.quit());
+  globalShortcut.register('Esc', () => app.quit()); // enable if you want ESC to quit
 }
 
 app.whenReady().then(() => {
