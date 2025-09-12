@@ -5,27 +5,25 @@
 <title>Desktop → ASCII Overlay</title>
 <style>
   html, body { margin:0; height:100%; background:#000; }
-
   pre#ascii {
     position: fixed; inset: 0;
     margin: 0;
     color: #fff;
     font-family: "Consolas", "DejaVu Sans Mono", monospace;
-    font-size: 10px;     /* will be adjusted by JS (auto or fixed px) */
-    line-height: 0.9em;  /* tight-ish, helps aspect ratio */
+    font-size: 10px;     /* adjusted by JS (auto or fixed px) */
+    line-height: 0.9em;
     white-space: pre;
     letter-spacing: 0;
     user-select: none;
     pointer-events: none;
   }
-
   .hud {
     position: fixed; left: 8px; top: 8px;
     color: #0f0;
     font: 12px/1 monospace;
     opacity: 0.8;
     pointer-events: none;
-    text-shadow: 0 0 4px #000;
+    text-shadow: 0 0 4px #000; 
   }
 </style>
 </head>
@@ -36,7 +34,6 @@
 <script>
   const { desktopCapturer } = require('electron');
 
-  const ASCII = " .:-=+*#%@";
   const MAX_FPS = 30;
 
   const pre = document.getElementById('ascii');
@@ -46,7 +43,7 @@
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d', { willReadFrequently: true });
 
-  // Read rectangles (DIP) + size from URL
+  // Read rectangles (DIP) + options from URL
   const q = new URLSearchParams(location.search);
   const BX = +q.get('bx'), BY = +q.get('by'), BW = +q.get('bw'), BH = +q.get('bh');
   const WX = +q.get('wx'), WY = +q.get('wy'), WW = +q.get('ww'), WH = +q.get('wh');
@@ -54,17 +51,31 @@
   const sizePx = /^\d+$/.test(sizeParamRaw) ? parseInt(sizeParamRaw, 10) : null;
   const sizeMode = sizePx ? 'fixed' : 'auto';
 
+  const ASCII_DEFAULT = " .:-=+*#%@";
+  let ASCII = ASCII_DEFAULT;
+  const charsetParamRaw = q.get('ch');
+  if (charsetParamRaw !== null) {
+    // preserve spaces and ordering exactly as provided
+    if (charsetParamRaw.length >= 2) {
+      ASCII = charsetParamRaw;
+    } else if (charsetParamRaw.length === 1) {
+      // 1-char set is allowed, but produces flat output
+      ASCII = charsetParamRaw;
+    } else {
+      ASCII = ASCII_DEFAULT;
+    }
+  }
+
   function grayToChar(g) {
+    // first character = darkest, last = brightest
     return ASCII[Math.floor(g * (ASCII.length - 1) / 255)];
   }
 
   function applyFont() {
     if (sizeMode === 'fixed') {
       pre.style.fontSize = sizePx + 'px';
-      // keep line-height tied to font-size for stable cell height
       pre.style.lineHeight = Math.max(1, Math.round(sizePx * 0.9)) + 'px';
     } else {
-      // auto: pick a reasonable default; grid still adapts to window
       const base = Math.max(8, Math.min(14, Math.round(Math.min(window.innerWidth, window.innerHeight) / 90)));
       pre.style.fontSize = base + 'px';
       pre.style.lineHeight = Math.max(1, Math.round(base * 0.9)) + 'px';
@@ -72,7 +83,6 @@
   }
 
   function measureChar() {
-    // Measure the actual character cell in CSS pixels (DIP)
     const test = document.createElement('span');
     test.textContent = '0'.repeat(200);
     const cs = getComputedStyle(pre);
@@ -110,7 +120,7 @@
           chromeMediaSourceId: source.id,
           maxFrameRate: MAX_FPS
         },
-        cursor: 'never' // Do not capture mouse pointer (avoid "ghost cursor")
+        cursor: 'never' // no "ghost cursor" in capture
       }
     });
   }
@@ -127,7 +137,7 @@
       video.muted = true;
       await video.play();
 
-      // Compute crop to workArea in video pixels
+      // Crop to workArea (avoid taskbar duplication)
       const scaleX = video.videoWidth / BW;
       const scaleY = video.videoHeight / BH;
       const crop = {
@@ -137,7 +147,6 @@
         sh: WH * scaleY
       };
 
-      // Recompute on window resize
       window.addEventListener('resize', () => {
         if (sizeMode === 'auto') applyFont();
         const r = recalcGrid();
@@ -147,11 +156,9 @@
       let frames = 0, lastFpsT = performance.now();
 
       function loop(now) {
-        // Draw ONLY the work area (no taskbar) → scale to ASCII grid size
         ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, c.width, c.height);
         const data = ctx.getImageData(0, 0, c.width, c.height).data;
 
-        // Map to ASCII
         let out = '';
         for (let y = 0, i = 0; y < c.height; y++) {
           for (let x = 0; x < c.width; x++, i += 4) {
@@ -167,7 +174,7 @@
           const fps = Math.round(frames * 1000 / (now - lastFpsT));
           const cs = getComputedStyle(pre);
           const sizeLbl = sizeMode === 'auto' ? 'auto' : `${parseFloat(cs.fontSize)}px`;
-          hud.textContent = `ASCII ${c.width}x${c.height} | size: ${sizeLbl} | ~${fps} FPS`;
+          hud.textContent = `ASCII ${c.width}x${c.height} | size: ${sizeLbl} | set: ${ASCII.length} chars | ~${fps} FPS | ESC zum Beenden`;
           frames = 0;
           lastFpsT = now;
         }
