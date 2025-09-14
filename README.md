@@ -64,3 +64,4 @@ ________________________________________________________________________________
 <br>
 <br>
 If there are any Errors let me know in the ``` Issues ``` Tab
+If you have Ideas to upgrade the application, write me :^)
